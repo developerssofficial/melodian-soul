@@ -4,7 +4,7 @@ import { auth, googleProvider } from "@/lib/firebase";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Repeat, Shuffle, Volume2, VolumeX, LogIn, LogOut } from "lucide-react";
 import YouTube from "react-youtube";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 const YT_API_KEY = "AIzaSyCIFum0PPHPcgK5ns55D-BfGvYgT0uQLJE";
 
@@ -20,13 +20,11 @@ export default function MelodianSoul() {
   const [volume, setVolume] = useState(80);
   const [mounted, setMounted] = useState(false);
 
-  // আপনার পছন্দের ভাইবগুলো
   const moodKeywords = [
     "Bangla Lofi Mashup", "Coke Studio Bangla", "Pritom Hasan Hits", 
     "Tahsan Khan Songs", "Habib Wahid Best", "Arijit Singh Bangla"
   ];
 
-  // ইউটিউব থেকে ৫০টি গান সার্চ করার ফাংশন
   const searchMusic = async (query: string) => {
     if (!query) return;
     try {
@@ -43,6 +41,24 @@ export default function MelodianSoul() {
         if (formatted.length > 0 && !currentSong) setCurrentSong(formatted[0]);
       }
     } catch (err) { console.error("Search Error:", err); }
+  };
+
+  // পরের গান প্লে করার ফাংশন
+  const playNextSong = () => {
+    if (songs.length > 0) {
+      const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
+      const nextIndex = (currentIndex + 1) % songs.length;
+      setCurrentSong(songs[nextIndex]);
+    }
+  };
+
+  // আগের গান প্লে করার ফাংশন
+  const playPreviousSong = () => {
+    if (songs.length > 0) {
+      const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
+      const prevIndex = (currentIndex - 1 + songs.length) % songs.length;
+      setCurrentSong(songs[prevIndex]);
+    }
   };
 
   useEffect(() => {
@@ -73,13 +89,11 @@ export default function MelodianSoul() {
   return (
     <main className="min-h-screen bg-[#050505] text-white p-4 md:p-8 font-sans relative overflow-hidden">
       
-      {/* Background Glows */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div animate={{ x: [0, 50, 0] }} transition={{ duration: 20, repeat: Infinity }} className="absolute -top-20 -left-20 w-[600px] h-[600px] bg-purple-600/10 blur-[150px] rounded-full" />
         <motion.div animate={{ x: [0, -50, 0] }} transition={{ duration: 25, repeat: Infinity }} className="absolute -bottom-40 -right-20 w-[700px] h-[700px] bg-pink-600/10 blur-[150px] rounded-full" />
       </div>
 
-      {/* Navbar (Add Song Removed, Login Added) */}
       <nav className="max-w-7xl mx-auto flex justify-between items-center mb-10 relative z-10">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl shadow-lg"><Music size={26} /></div>
@@ -111,13 +125,15 @@ export default function MelodianSoul() {
       </nav>
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
-        {/* Main Content (Left) */}
         <div className="lg:col-span-8 space-y-8">
           {currentSong && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative rounded-[3rem] bg-white/[0.02] border border-white/10 p-8 md:p-12 flex flex-col md:flex-row items-center gap-10 backdrop-blur-3xl shadow-2xl">
                <div className="hidden">
                 <YouTube videoId={currentSong.id} opts={{ playerVars: { autoplay: 1, controls: 0 } }} 
-                  onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} 
+                  onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} 
+                  onPlay={() => setIsPlaying(true)} 
+                  onPause={() => setIsPlaying(false)}
+                  onEnd={playNextSong} // গান শেষ হলে অটোমেটিক পরের গান প্লে হবে
                 />
               </div>
               <img src={currentSong.cover} className="w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] object-cover border border-white/10 shadow-2xl" />
@@ -132,7 +148,6 @@ export default function MelodianSoul() {
             </motion.div>
           )}
           
-          {/* Your Vibe List (Unlimited Scrollable) */}
           <div className="bg-white/[0.01] border border-white/5 rounded-[3rem] p-8 backdrop-blur-sm">
             <h3 className="text-2xl font-black mb-6 flex items-center gap-3"><Music className="text-pink-500" /> Your Vibe List</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-4 custom-scrollbar">
@@ -146,7 +161,6 @@ export default function MelodianSoul() {
           </div>
         </div>
 
-        {/* Sidebar Discovery Queue (Right) */}
         <div className="lg:col-span-4 bg-white/[0.04] p-8 rounded-[3rem] backdrop-blur-3xl border border-white/10 shadow-2xl h-fit">
           <h3 className="text-xl font-black mb-6">Discovery Queue</h3>
           <div className="space-y-5 max-h-[850px] overflow-y-auto pr-2 custom-scrollbar">
@@ -160,7 +174,6 @@ export default function MelodianSoul() {
         </div>
       </div>
 
-      {/* Floating Player (Volume & Progress Added) */}
       {currentSong && (
         <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-5xl bg-black/60 backdrop-blur-[40px] border border-white/10 px-8 py-4 rounded-[3rem] z-50 flex flex-col gap-2 shadow-2xl">
           <div className="flex items-center gap-4 w-full">
@@ -174,11 +187,11 @@ export default function MelodianSoul() {
               <div className="hidden sm:block overflow-hidden"><h4 className="font-bold text-xs truncate">{currentSong.title}</h4><p className="text-[9px] text-pink-500 font-black uppercase">{currentSong.artist}</p></div>
             </div>
             <div className="flex items-center gap-8">
-              <SkipBack size={22} className="text-gray-400 hover:text-white cursor-pointer" />
+              <SkipBack size={22} className="text-gray-400 hover:text-white cursor-pointer" onClick={playPreviousSong} />
               <button onClick={() => isPlaying ? player?.pauseVideo() : player?.playVideo()} className="bg-white text-black p-3.5 rounded-full hover:scale-110 active:scale-95 transition-all shadow-xl">
                 {isPlaying ? <Pause size={22} fill="black" /> : <Play size={22} fill="black" className="ml-1" />}
               </button>
-              <SkipForward size={22} className="text-gray-400 hover:text-white cursor-pointer" />
+              <SkipForward size={22} className="text-gray-400 hover:text-white cursor-pointer" onClick={playNextSong} />
             </div>
             <div className="w-1/3 flex justify-end items-center gap-6">
                <div className="flex items-center gap-3 group relative">
