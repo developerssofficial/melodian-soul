@@ -43,7 +43,7 @@ export default function MelodianSoul() {
     } catch (err) { console.error("Search Error:", err); }
   };
 
-  // পরের গান প্লে করার ফাংশন
+  // গান অটো-প্লে করার ফাংশন
   const playNextSong = () => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
@@ -52,7 +52,6 @@ export default function MelodianSoul() {
     }
   };
 
-  // আগের গান প্লে করার ফাংশন
   const playPreviousSong = () => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
@@ -133,7 +132,7 @@ export default function MelodianSoul() {
                   onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} 
                   onPlay={() => setIsPlaying(true)} 
                   onPause={() => setIsPlaying(false)}
-                  onEnd={playNextSong} // গান শেষ হলে অটোমেটিক পরের গান প্লে হবে
+                  onEnd={playNextSong}
                 />
               </div>
               <img src={currentSong.cover} className="w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] object-cover border border-white/10 shadow-2xl" />
