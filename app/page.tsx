@@ -11,6 +11,7 @@ const YT_API_KEY = "AIzaSyCIFum0PPHPcgK5ns55D-BfGvYgT0uQLJE";
 export default function MelodianSoul() {
   const [user, setUser] = useState<any>(null);
   const [songs, setSongs] = useState<any[]>([]);
+  const [discoveryQueue, setDiscoveryQueue] = useState<any[]>([]); // রিলেটেড গানের জন্য আলাদা স্টেট
   const [currentSong, setCurrentSong] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [player, setPlayer] = useState<any>(null);
@@ -25,10 +26,13 @@ export default function MelodianSoul() {
     "Tahsan Khan Songs", "Habib Wahid Best", "Arijit Singh Bangla"
   ];
 
+  // সার্চ ফাংশন - রেজাল্ট আরও মিক্সড করার জন্য মডিফাই করা হয়েছে
   const searchMusic = async (query: string) => {
     if (!query) return;
     try {
-      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(query)}&type=video&key=${YT_API_KEY}`);
+      // শুধু নাম না দিয়ে সাথে কিছু কি-ওয়ার্ড যোগ করা হয়েছে যাতে রেজাল্ট মিক্সড আসে
+      const enhancedQuery = `${query} music remix lofi`;
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=25&q=${encodeURIComponent(enhancedQuery)}&type=video&key=${YT_API_KEY}`);
       const data = await response.json();
       if (data.items) {
         const formatted = data.items.map((item: any) => ({
@@ -38,26 +42,50 @@ export default function MelodianSoul() {
           cover: item.snippet.thumbnails.high.url,
         }));
         setSongs(formatted);
-        if (formatted.length > 0 && !currentSong) setCurrentSong(formatted[0]);
+        if (formatted.length > 0 && !currentSong) handleSongSelect(formatted[0]);
       }
     } catch (err) { console.error("Search Error:", err); }
   };
 
-  // পরের গান প্লে করার ফাংশন
+  // রিলেটেড গান খুঁজে বের করার ফাংশন
+  const fetchRelatedSongs = async (videoId: string) => {
+    try {
+      // ইউটিউবের নতুন নিয়ম অনুযায়ী search এপিআই দিয়ে রিলেটেড কন্টেন্ট আনা হচ্ছে
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=20&relatedToVideoId=${videoId}&key=${YT_API_KEY}`);
+      const data = await response.json();
+      if (data.items) {
+        const formatted = data.items.map((item: any) => ({
+          id: item.id.videoId,
+          title: item.snippet.title,
+          artist: item.snippet.channelTitle,
+          cover: item.snippet.thumbnails.high.url,
+        }));
+        setDiscoveryQueue(formatted);
+      }
+    } catch (err) { console.error("Related Songs Error:", err); }
+  };
+
+  // গান সিলেক্ট করলে একসাথে রিলেটেড গানও লোড হবে
+  const handleSongSelect = (song: any) => {
+    setCurrentSong(song);
+    fetchRelatedSongs(song.id);
+  };
+
   const playNextSong = () => {
-    if (songs.length > 0) {
-      const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
-      const nextIndex = (currentIndex + 1) % songs.length;
-      setCurrentSong(songs[nextIndex]);
+    const allAvailableSongs = [...songs, ...discoveryQueue];
+    if (allAvailableSongs.length > 0) {
+      const currentIndex = allAvailableSongs.findIndex((s) => s.id === currentSong?.id);
+      const nextIndex = (currentIndex + 1) % allAvailableSongs.length;
+      handleSongSelect(allAvailableSongs[nextIndex]);
     }
   };
 
-  // আগের গান প্লে করার ফাংশন
   const playPreviousSong = () => {
-    if (songs.length > 0) {
-      const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
-      const prevIndex = (currentIndex - 1 + songs.length) % songs.length;
-      setCurrentSong(songs[prevIndex]);
+    const allAvailableSongs = [...songs, ...discoveryQueue];
+    if (allAvailableSongs.length > 0) {
+      const currentIndex = allAvailableSongs.findIndex((s) => s.id === currentSong?.id);
+      const prevIndex = (currentIndex - 1 + allAvailableSongs.length) % allAvailableSongs.length;
+      handleSongSelect(allAvailableSongs[prevIndex]);
     }
   };
 
@@ -133,7 +161,7 @@ export default function MelodianSoul() {
                   onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} 
                   onPlay={() => setIsPlaying(true)} 
                   onPause={() => setIsPlaying(false)}
-                  onEnd={playNextSong} // গান শেষ হলে অটোমেটিক পরের গান প্লে হবে
+                  onEnd={playNextSong}
                 />
               </div>
               <img src={currentSong.cover} className="w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] object-cover border border-white/10 shadow-2xl" />
@@ -149,10 +177,10 @@ export default function MelodianSoul() {
           )}
           
           <div className="bg-white/[0.01] border border-white/5 rounded-[3rem] p-8 backdrop-blur-sm">
-            <h3 className="text-2xl font-black mb-6 flex items-center gap-3"><Music className="text-pink-500" /> Your Vibe List</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-4 custom-scrollbar">
+            <h3 className="text-2xl font-black mb-6 flex items-center gap-3"><Music className="text-pink-500" /> Search Results</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
               {songs.map((song) => (
-                <div key={song.id} onClick={() => setCurrentSong(song)} className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all ${currentSong?.id === song.id ? "bg-white/10 border border-white/10 shadow-lg" : "hover:bg-white/5 border border-transparent"}`}>
+                <div key={song.id} onClick={() => handleSongSelect(song)} className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all ${currentSong?.id === song.id ? "bg-white/10 border border-white/10 shadow-lg" : "hover:bg-white/5 border border-transparent"}`}>
                   <img src={song.cover} className="w-14 h-14 rounded-xl object-cover" />
                   <div className="flex-1 overflow-hidden"><h4 className="font-bold text-sm truncate">{song.title}</h4><p className="text-[10px] text-gray-500 uppercase">{song.artist}</p></div>
                 </div>
@@ -162,14 +190,14 @@ export default function MelodianSoul() {
         </div>
 
         <div className="lg:col-span-4 bg-white/[0.04] p-8 rounded-[3rem] backdrop-blur-3xl border border-white/10 shadow-2xl h-fit">
-          <h3 className="text-xl font-black mb-6">Discovery Queue</h3>
+          <h3 className="text-xl font-black mb-6">Discovery Queue (Recommended)</h3>
           <div className="space-y-5 max-h-[850px] overflow-y-auto pr-2 custom-scrollbar">
-             {songs.slice(10, 50).map((song) => (
-                <div key={song.id} onClick={() => setCurrentSong(song)} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform">
+             {discoveryQueue.length > 0 ? discoveryQueue.map((song) => (
+                <div key={song.id} onClick={() => handleSongSelect(song)} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform">
                   <img src={song.cover} className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
                   <div className="flex-1 overflow-hidden"><h4 className="font-bold text-[12px] truncate">{song.title}</h4><p className="text-[10px] text-gray-500">{song.artist}</p></div>
                 </div>
-              ))}
+              )) : <p className="text-xs text-gray-500">Play a song to see recommendations...</p>}
           </div>
         </div>
       </div>
