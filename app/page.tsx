@@ -25,11 +25,18 @@ export default function MelodianSoul() {
     "Tahsan Khan Songs", "Habib Wahid Best", "Arijit Singh Bangla"
   ];
 
+  // সার্চ ফাংশন - যেখানে রিকমেন্ডেশন লজিক যোগ করা হয়েছে
   const searchMusic = async (query: string) => {
     if (!query) return;
     try {
-      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(query)}&type=video&key=${YT_API_KEY}`);
+      // enhancedQuery ব্যবহার করা হয়েছে যাতে ইউটিউব রিলেটেড গানও পাঠায়
+      const enhancedQuery = `${query} official music and related songs`;
+      
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(enhancedQuery)}&type=video&videoCategoryId=10&key=${YT_API_KEY}`
+      );
       const data = await response.json();
+      
       if (data.items) {
         const formatted = data.items.map((item: any) => ({
           id: item.id.videoId,
@@ -37,13 +44,18 @@ export default function MelodianSoul() {
           artist: item.snippet.channelTitle,
           cover: item.snippet.thumbnails.high.url,
         }));
+
+        // ডাটা সেট করা
         setSongs(formatted);
+        
+        // যদি আগে থেকে কোনো গান প্লে না হতে থাকে, তবে প্রথম গানটি সিলেক্ট করবে
         if (formatted.length > 0 && !currentSong) setCurrentSong(formatted[0]);
       }
-    } catch (err) { console.error("Search Error:", err); }
+    } catch (err) { 
+      console.error("Search Error:", err); 
+    }
   };
 
-  // পরের গান প্লে করার ফাংশন
   const playNextSong = () => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
@@ -52,7 +64,6 @@ export default function MelodianSoul() {
     }
   };
 
-  // আগের গান প্লে করার ফাংশন
   const playPreviousSong = () => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
@@ -89,6 +100,7 @@ export default function MelodianSoul() {
   return (
     <main className="min-h-screen bg-[#050505] text-white p-4 md:p-8 font-sans relative overflow-hidden">
       
+      {/* Background Glows */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div animate={{ x: [0, 50, 0] }} transition={{ duration: 20, repeat: Infinity }} className="absolute -top-20 -left-20 w-[600px] h-[600px] bg-purple-600/10 blur-[150px] rounded-full" />
         <motion.div animate={{ x: [0, -50, 0] }} transition={{ duration: 25, repeat: Infinity }} className="absolute -bottom-40 -right-20 w-[700px] h-[700px] bg-pink-600/10 blur-[150px] rounded-full" />
@@ -133,7 +145,7 @@ export default function MelodianSoul() {
                   onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} 
                   onPlay={() => setIsPlaying(true)} 
                   onPause={() => setIsPlaying(false)}
-                  onEnd={playNextSong} // গান শেষ হলে অটোমেটিক পরের গান প্লে হবে
+                  onEnd={playNextSong}
                 />
               </div>
               <img src={currentSong.cover} className="w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] object-cover border border-white/10 shadow-2xl" />
@@ -164,7 +176,7 @@ export default function MelodianSoul() {
         <div className="lg:col-span-4 bg-white/[0.04] p-8 rounded-[3rem] backdrop-blur-3xl border border-white/10 shadow-2xl h-fit">
           <h3 className="text-xl font-black mb-6">Discovery Queue</h3>
           <div className="space-y-5 max-h-[850px] overflow-y-auto pr-2 custom-scrollbar">
-             {songs.slice(10, 50).map((song) => (
+             {songs.slice(0, 50).map((song) => (
                 <div key={song.id} onClick={() => setCurrentSong(song)} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform">
                   <img src={song.cover} className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
                   <div className="flex-1 overflow-hidden"><h4 className="font-bold text-[12px] truncate">{song.title}</h4><p className="text-[10px] text-gray-500">{song.artist}</p></div>
@@ -174,6 +186,7 @@ export default function MelodianSoul() {
         </div>
       </div>
 
+      {/* Player Bar */}
       {currentSong && (
         <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-5xl bg-black/60 backdrop-blur-[40px] border border-white/10 px-8 py-4 rounded-[3rem] z-50 flex flex-col gap-2 shadow-2xl">
           <div className="flex items-center gap-4 w-full">
