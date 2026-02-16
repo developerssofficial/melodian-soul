@@ -6,7 +6,12 @@ import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, LogI
 import YouTube from "react-youtube";
 import { motion, AnimatePresence } from "framer-motion";
 
-const YT_API_KEY = "AIzaSyCIFum0PPHPcgK5ns55D-BfGvYgT0uQLJE";
+// তোমার সংগৃহীত ৩টি কী এখানে সেট করে দিলাম
+const API_KEYS = [
+  "AIzaSyD6-OdNvUqan2JsyPkGtDQm67VPGiyXXZk",
+  "AIzaSyBrqfEYpyBc0HiMjNJcaBvSyOJM-ynha00",
+  "AIzaSyCIFum0PPHPcgK5ns55D-BfGvYgT0uQLJE"
+];
 
 export default function MelodianSoul() {
   const [user, setUser] = useState<any>(null);
@@ -18,34 +23,55 @@ export default function MelodianSoul() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(80);
-  const [loading, setLoading] = useState(false); // লোডিং স্টেট
+  const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   const moodKeywords = ["Bangla Lofi Mashup", "Coke Studio Bangla", "Arijit Singh Hits"];
 
+  // নতুন মাল্টি-কী সার্চ লজিক
   const searchMusic = async (query: string) => {
     if (!query) return;
-    setLoading(true); // লোডিং শুরু
+    setLoading(true);
+
+    const fetchDataWithRotation = async (index: number): Promise<any> => {
+      if (index >= API_KEYS.length) {
+        throw new Error("সবগুলো API Key-র লিমিট শেষ! আগামীকাল আবার ট্রাই করো।");
+      }
+      try {
+        const enhancedQuery = `${query} official music and related songs`;
+        const response = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=40&q=${encodeURIComponent(enhancedQuery)}&type=video&videoCategoryId=10&key=${API_KEYS[index]}`
+        );
+
+        if (response.status === 403) {
+          console.warn(`Key ${index + 1} এর কোটা শেষ, পরেরটা ট্রাই করছি...`);
+          return fetchDataWithRotation(index + 1);
+        }
+        if (!response.ok) throw new Error("API Error");
+        return await response.json();
+      } catch (err) {
+        if (index + 1 < API_KEYS.length) return fetchDataWithRotation(index + 1);
+        throw err;
+      }
+    };
+
     try {
-      const enhancedQuery = `${query} official music and related songs`;
-      const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(enhancedQuery)}&type=video&videoCategoryId=10&key=${YT_API_KEY}`
-      );
-      const data = await response.json();
-      
-      if (data.items) {
+      const data = await fetchDataWithRotation(0);
+      if (data?.items) {
         const formatted = data.items.map((item: any) => ({
           id: item.id.videoId,
           title: item.snippet.title,
           artist: item.snippet.channelTitle,
           cover: item.snippet.thumbnails.high.url,
         }));
-
         setSongs(formatted);
-        if (formatted.length > 0) setCurrentSong(formatted[0]); // প্রথম গানটি অটো সিলেক্ট
+        if (formatted.length > 0) setCurrentSong(formatted[0]);
       }
-    } catch (err) { console.error("Search Error:", err); }
-    setLoading(false); // লোডিং শেষ
+    } catch (err: any) {
+      console.error(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const playNextSong = () => {
@@ -84,7 +110,7 @@ export default function MelodianSoul() {
   return (
     <main className="min-h-screen bg-[#050505] text-white p-4 md:p-8 font-sans relative overflow-hidden">
       
-      {/* Background Animated Glows */}
+      {/* Background Animated Glows (আগের মতোই আছে) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div animate={{ x: [0, 50, 0], opacity: [0.1, 0.2, 0.1] }} transition={{ duration: 20, repeat: Infinity }} className="absolute -top-20 -left-20 w-[600px] h-[600px] bg-purple-600 blur-[150px] rounded-full" />
         <motion.div animate={{ x: [0, -50, 0], opacity: [0.1, 0.2, 0.1] }} transition={{ duration: 25, repeat: Infinity }} className="absolute -bottom-40 -right-20 w-[700px] h-[700px] bg-pink-600 blur-[150px] rounded-full" />
@@ -162,7 +188,7 @@ export default function MelodianSoul() {
                       </p>
                     </div>
                   </div>
-              ))}
+                ))}
             </div>
           </div>
         </div>
@@ -170,7 +196,7 @@ export default function MelodianSoul() {
         <div className="lg:col-span-4 bg-white/[0.04] p-8 rounded-[3rem] backdrop-blur-3xl border border-white/10 shadow-2xl h-fit">
           <h3 className="text-xl font-black mb-6">Discovery Queue</h3>
           <div className="space-y-5 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
-             {loading ? [...Array(8)].map((_, i) => <div key={i} className="h-16 bg-white/5 rounded-2xl animate-pulse" />) : 
+              {loading ? [...Array(8)].map((_, i) => <div key={i} className="h-16 bg-white/5 rounded-2xl animate-pulse" />) : 
                songs.slice(1, 40).map((song) => (
                 <div key={song.id} onClick={() => setCurrentSong(song)} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform group">
                   <img src={song.cover} className="w-14 h-14 rounded-2xl object-cover border border-white/10" />
@@ -181,6 +207,7 @@ export default function MelodianSoul() {
         </div>
       </div>
 
+      {/* Music Controller Bottom Bar (সব ফিচার ঠিক আছে) */}
       {currentSong && (
         <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-5xl bg-black/80 backdrop-blur-3xl border border-white/10 px-8 py-4 rounded-[3rem] z-50 flex flex-col gap-2">
           <div className="flex items-center gap-4 w-full px-2">
