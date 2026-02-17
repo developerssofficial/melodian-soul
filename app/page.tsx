@@ -1,12 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { auth, googleProvider } from "@/lib/firebase"; 
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, LogIn, LogOut, Loader2 } from "lucide-react";
 import YouTube from "react-youtube";
 import { motion, AnimatePresence } from "framer-motion";
 
-// তোমার সব কী-গুলো এখানে
 const API_KEYS = [
   "AIzaSyD6-OdNvUqan2JsyPkGtDQm67VPGiyXXZk",
   "AIzaSyBrqfEYpyBc0HiMjNJcaBvSyOJM-ynha00",
@@ -28,14 +27,11 @@ export default function MelodianSoul() {
 
   const moodKeywords = ["Bangla Lofi Mashup", "Coke Studio Bangla", "Arijit Singh Hits"];
 
-  // --- এই সেই ম্যাজিক্যাল স্মার্ট সার্চ ফাংশন ---
   const searchMusic = async (query: string) => {
     if (!query) return;
 
-    // ১. প্রথমে মেমোরি (Cache) চেক করা
     const cachedData = typeof window !== "undefined" ? localStorage.getItem(`cache_${query.toLowerCase()}`) : null;
     if (cachedData) {
-      console.log("Saving Quota! Loading from cache...");
       const data = JSON.parse(cachedData);
       setSongs(data);
       if (data.length > 0) setCurrentSong(data[0]);
@@ -43,17 +39,13 @@ export default function MelodianSoul() {
     }
 
     setLoading(true);
-
     const fetchDataWithRotation = async (index: number): Promise<any> => {
-      if (index >= API_KEYS.length) {
-        throw new Error("সবগুলো API Key-র লিমিট শেষ!");
-      }
+      if (index >= API_KEYS.length) throw new Error("সবগুলো API Key-র লিমিট শেষ!");
       try {
         const enhancedQuery = `${query} official music`;
         const response = await fetch(
           `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(enhancedQuery)}&type=video&videoCategoryId=10&key=${API_KEYS[index]}`
         );
-
         if (response.status === 403) return fetchDataWithRotation(index + 1);
         if (!response.ok) throw new Error("API Error");
         return await response.json();
@@ -72,10 +64,7 @@ export default function MelodianSoul() {
           artist: item.snippet.channelTitle,
           cover: item.snippet.thumbnails.high.url,
         }));
-
-        // ২. মেমোরিতে সেভ করে রাখা যাতে পরে আর টাকা/কোটা খরচ না হয়
         localStorage.setItem(`cache_${query.toLowerCase()}`, JSON.stringify(formatted));
-        
         setSongs(formatted);
         if (formatted.length > 0) setCurrentSong(formatted[0]);
       }
@@ -85,19 +74,23 @@ export default function MelodianSoul() {
       setLoading(false);
     }
   };
-  // --- সার্চ ফাংশন শেষ ---
 
-  const playNextSong = () => {
+  // --- গান পরিবর্তনের আপডেট লজিক ---
+  const playNextSong = useCallback(() => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
-      setCurrentSong(songs[(currentIndex + 1) % songs.length]);
+      const nextSong = songs[(currentIndex + 1) % songs.length];
+      setCurrentSong(nextSong);
+      // ব্যাকগ্রাউন্ডে অটো-প্লে সচল রাখতে
+      setIsPlaying(true);
     }
-  };
+  }, [songs, currentSong]);
 
   const playPreviousSong = () => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
       setCurrentSong(songs[(currentIndex - 1 + songs.length) % songs.length]);
+      setIsPlaying(true);
     }
   };
 
@@ -122,8 +115,6 @@ export default function MelodianSoul() {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white p-4 md:p-8 font-sans relative overflow-hidden">
-      
-      {/* Background Animated Glows */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div animate={{ x: [0, 50, 0], opacity: [0.1, 0.2, 0.1] }} transition={{ duration: 20, repeat: Infinity }} className="absolute -top-20 -left-20 w-[600px] h-[600px] bg-purple-600 blur-[150px] rounded-full" />
         <motion.div animate={{ x: [0, -50, 0], opacity: [0.1, 0.2, 0.1] }} transition={{ duration: 25, repeat: Infinity }} className="absolute -bottom-40 -right-20 w-[700px] h-[700px] bg-pink-600 blur-[150px] rounded-full" />
@@ -164,9 +155,13 @@ export default function MelodianSoul() {
             {currentSong ? (
               <motion.div key={currentSong.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="relative rounded-[3rem] bg-white/[0.02] border border-white/10 p-8 md:p-12 flex flex-col md:flex-row items-center gap-10 backdrop-blur-3xl shadow-2xl">
                  <div className="hidden">
-                  <YouTube videoId={currentSong.id} opts={{ playerVars: { autoplay: 1, controls: 0 } }} 
+                  <YouTube 
+                    videoId={currentSong.id} 
+                    opts={{ playerVars: { autoplay: 0, controls: 0, rel: 0, origin: window.location.origin } }} 
                     onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} 
-                    onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnd={playNextSong}
+                    onPlay={() => setIsPlaying(true)} 
+                    onPause={() => setIsPlaying(false)} 
+                    onEnd={playNextSong}
                   />
                 </div>
                 <div className="relative group">
@@ -192,7 +187,7 @@ export default function MelodianSoul() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
               {loading ? [...Array(6)].map((_, i) => <div key={i} className="h-20 bg-white/5 rounded-2xl animate-pulse" />) : 
                 songs.map((song) => (
-                  <div key={song.id} onClick={() => setCurrentSong(song)} className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all ${currentSong?.id === song.id ? "bg-white/10 border border-white/10 shadow-lg" : "hover:bg-white/5 border border-transparent"}`}>
+                  <div key={song.id} onClick={() => {setCurrentSong(song); setIsPlaying(true);}} className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all ${currentSong?.id === song.id ? "bg-white/10 border border-white/10 shadow-lg" : "hover:bg-white/5 border border-transparent"}`}>
                     <img src={song.cover} className="w-14 h-14 rounded-xl object-cover" />
                     <div className="flex-1 overflow-hidden">
                       <h4 className="font-bold text-sm truncate">{song.title}</h4>
@@ -211,7 +206,7 @@ export default function MelodianSoul() {
           <div className="space-y-5 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
               {loading ? [...Array(8)].map((_, i) => <div key={i} className="h-16 bg-white/5 rounded-2xl animate-pulse" />) : 
                songs.slice(1, 40).map((song) => (
-                <div key={song.id} onClick={() => setCurrentSong(song)} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform group">
+                <div key={song.id} onClick={() => {setCurrentSong(song); setIsPlaying(true);}} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform group">
                   <img src={song.cover} className="w-14 h-14 rounded-2xl object-cover border border-white/10" />
                   <div className="flex-1 overflow-hidden"><h4 className="font-bold text-[12px] truncate group-hover:text-pink-400">{song.title}</h4></div>
                 </div>
@@ -220,7 +215,6 @@ export default function MelodianSoul() {
         </div>
       </div>
 
-      {/* Music Controller Bottom Bar */}
       {currentSong && (
         <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-5xl bg-black/80 backdrop-blur-3xl border border-white/10 px-8 py-4 rounded-[3rem] z-50 flex flex-col gap-2">
           <div className="flex items-center gap-4 w-full px-2">
