@@ -75,22 +75,32 @@ export default function MelodianSoul() {
     }
   };
 
-  // --- গান পরিবর্তনের আপডেট লজিক ---
+  // স্টাক হওয়া বন্ধ করতে গান পরিবর্তনের হ্যান্ডলার
+  const handleSongChange = useCallback((song: any) => {
+    setIsPlaying(false);
+    setCurrentSong(song);
+    // প্লেয়ারকে নতুন গান লোড করার জন্য সামান্য সময় দেওয়া
+    setTimeout(() => {
+      if (player) {
+        player.loadVideoById(song.id);
+        player.playVideo();
+      }
+    }, 300);
+  }, [player]);
+
   const playNextSong = useCallback(() => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
       const nextSong = songs[(currentIndex + 1) % songs.length];
-      setCurrentSong(nextSong);
-      // ব্যাকগ্রাউন্ডে অটো-প্লে সচল রাখতে
-      setIsPlaying(true);
+      handleSongChange(nextSong);
     }
-  }, [songs, currentSong]);
+  }, [songs, currentSong, handleSongChange]);
 
   const playPreviousSong = () => {
     if (songs.length > 0) {
       const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
-      setCurrentSong(songs[(currentIndex - 1 + songs.length) % songs.length]);
-      setIsPlaying(true);
+      const prevSong = songs[(currentIndex - 1 + songs.length) % songs.length];
+      handleSongChange(prevSong);
     }
   };
 
@@ -104,8 +114,12 @@ export default function MelodianSoul() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (player && isPlaying) {
-        setCurrentTime(player.getCurrentTime());
-        setDuration(player.getDuration());
+        try {
+          setCurrentTime(player.getCurrentTime());
+          setDuration(player.getDuration());
+        } catch (e) {
+          // প্লেয়ার রেডি না থাকলে এরর এড়াতে
+        }
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -157,11 +171,12 @@ export default function MelodianSoul() {
                  <div className="hidden">
                   <YouTube 
                     videoId={currentSong.id} 
-                    opts={{ playerVars: { autoplay: 0, controls: 0, rel: 0, origin: window.location.origin } }} 
+                    opts={{ playerVars: { autoplay: 0, controls: 0, rel: 0, modestbranding: 1 } }} 
                     onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} 
                     onPlay={() => setIsPlaying(true)} 
                     onPause={() => setIsPlaying(false)} 
                     onEnd={playNextSong}
+                    onStateChange={(e) => { if (e.data === 1) setIsPlaying(true); }}
                   />
                 </div>
                 <div className="relative group">
@@ -187,7 +202,7 @@ export default function MelodianSoul() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
               {loading ? [...Array(6)].map((_, i) => <div key={i} className="h-20 bg-white/5 rounded-2xl animate-pulse" />) : 
                 songs.map((song) => (
-                  <div key={song.id} onClick={() => {setCurrentSong(song); setIsPlaying(true);}} className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all ${currentSong?.id === song.id ? "bg-white/10 border border-white/10 shadow-lg" : "hover:bg-white/5 border border-transparent"}`}>
+                  <div key={song.id} onClick={() => handleSongChange(song)} className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all ${currentSong?.id === song.id ? "bg-white/10 border border-white/10 shadow-lg" : "hover:bg-white/5 border border-transparent"}`}>
                     <img src={song.cover} className="w-14 h-14 rounded-xl object-cover" />
                     <div className="flex-1 overflow-hidden">
                       <h4 className="font-bold text-sm truncate">{song.title}</h4>
@@ -206,7 +221,7 @@ export default function MelodianSoul() {
           <div className="space-y-5 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
               {loading ? [...Array(8)].map((_, i) => <div key={i} className="h-16 bg-white/5 rounded-2xl animate-pulse" />) : 
                songs.slice(1, 40).map((song) => (
-                <div key={song.id} onClick={() => {setCurrentSong(song); setIsPlaying(true);}} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform group">
+                <div key={song.id} onClick={() => handleSongChange(song)} className="flex items-center gap-4 cursor-pointer hover:translate-x-2 transition-transform group">
                   <img src={song.cover} className="w-14 h-14 rounded-2xl object-cover border border-white/10" />
                   <div className="flex-1 overflow-hidden"><h4 className="font-bold text-[12px] truncate group-hover:text-pink-400">{song.title}</h4></div>
                 </div>
