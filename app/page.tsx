@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { auth, googleProvider } from "@/lib/firebase";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, LogIn, LogOut, Loader2 } from "lucide-react";
+import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, Loader2 } from "lucide-react";
 import YouTube from "react-youtube";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -54,7 +54,10 @@ export default function MelodianSoul() {
           // Cache valid for 7 days
           if (Date.now() - parsed.timestamp < 7 * 24 * 60 * 60 * 1000) {
             setSongs(parsed.data);
-            if (parsed.data.length > 0) setCurrentSong(parsed.data[0]);
+            if (parsed.data.length > 0) {
+              setCurrentSong(parsed.data[0]);
+              setIsPlaying(true);   // auto-play after cache load
+            }
             return;
           } else {
             localStorage.removeItem(`cache_${query.toLowerCase()}`);
@@ -108,7 +111,10 @@ export default function MelodianSoul() {
         localStorage.setItem(`cache_${query.toLowerCase()}`, JSON.stringify(cacheItem));
 
         setSongs(formatted);
-        if (formatted.length > 0) setCurrentSong(formatted[0]);
+        if (formatted.length > 0) {
+          setCurrentSong(formatted[0]);
+          setIsPlaying(true);   // auto-play after fresh load
+        }
       }
     } catch (err: any) {
       console.error(err.message);
@@ -124,8 +130,12 @@ export default function MelodianSoul() {
       setCurrentSong(song);
       setIsPlaying(true);
       if (player) {
-        player.loadVideoById(song.id);
-        player.playVideo();
+        try {
+          player.loadVideoById(song.id);
+          player.playVideo();
+        } catch (e) {
+          console.error("Player error:", e);
+        }
       }
     },
     [player]
@@ -204,6 +214,28 @@ export default function MelodianSoul() {
     };
     cleanupOldCache();
   }, []);
+
+  // ** Auto-play effect: when player is ready and we have a currentSong with isPlaying=true **
+  useEffect(() => {
+    if (player && currentSong && isPlaying) {
+      try {
+        // Check if the player already has the correct video loaded
+        const currentVideoId = player.getVideoData().video_id;
+        if (currentVideoId !== currentSong.id) {
+          player.loadVideoById(currentSong.id);
+        }
+        player.playVideo();
+      } catch (e) {
+        // If getVideoData fails (player not fully initialized), fallback to loadVideoById
+        try {
+          player.loadVideoById(currentSong.id);
+          player.playVideo();
+        } catch (err) {
+          console.error("Failed to auto-play:", err);
+        }
+      }
+    }
+  }, [player, currentSong, isPlaying]);
 
   // Memoized values for performance
   const memoizedSongs = useMemo(() => songs, [songs]);
@@ -303,14 +335,22 @@ export default function MelodianSoul() {
                     onReady={(e) => {
                       setPlayer(e.target);
                       e.target.setVolume(volume);
+                      // If we already have a current song and isPlaying true, play it immediately
+                      if (currentSong && isPlaying) {
+                        try {
+                          e.target.loadVideoById(currentSong.id);
+                          e.target.playVideo();
+                        } catch (err) {
+                          console.error("Error in onReady autoplay:", err);
+                        }
+                      }
                     }}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
                     onEnd={playNextSong}
                     onStateChange={(e) => {
-                      // If video is cued (state 5) and we want to play, but handleSongChange already calls playVideo
-                      if (e.data === 1) setIsPlaying(true); // playing
-                      if (e.data === 2) setIsPlaying(false); // paused
+                      if (e.data === 1) setIsPlaying(true);
+                      if (e.data === 2) setIsPlaying(false);
                     }}
                   />
                 </div>
