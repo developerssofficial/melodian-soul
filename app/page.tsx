@@ -75,17 +75,16 @@ export default function MelodianSoul() {
     }
   };
 
-  // স্টাক হওয়া বন্ধ করতে গান পরিবর্তনের হ্যান্ডলার
+  // --- অটো-প্লে ফিক্স করার জন্য নতুন হ্যান্ডলার ---
   const handleSongChange = useCallback((song: any) => {
-    setIsPlaying(false);
     setCurrentSong(song);
-    // প্লেয়ারকে নতুন গান লোড করার জন্য সামান্য সময় দেওয়া
-    setTimeout(() => {
-      if (player) {
-        player.loadVideoById(song.id);
-        player.playVideo();
-      }
-    }, 300);
+    setIsPlaying(true); // গান পরিবর্তনের সাথে সাথে ট্রু করে দেওয়া
+    
+    if (player) {
+      // সরাসরি ইউটিউব প্লেয়ারকে কমান্ড দেওয়া যাতে লোড হয়েই বাজতে শুরু করে
+      player.loadVideoById(song.id);
+      player.playVideo();
+    }
   }, [player]);
 
   const playNextSong = useCallback(() => {
@@ -117,9 +116,7 @@ export default function MelodianSoul() {
         try {
           setCurrentTime(player.getCurrentTime());
           setDuration(player.getDuration());
-        } catch (e) {
-          // প্লেয়ার রেডি না থাকলে এরর এড়াতে
-        }
+        } catch (e) {}
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -176,7 +173,11 @@ export default function MelodianSoul() {
                     onPlay={() => setIsPlaying(true)} 
                     onPause={() => setIsPlaying(false)} 
                     onEnd={playNextSong}
-                    onStateChange={(e) => { if (e.data === 1) setIsPlaying(true); }}
+                    onStateChange={(e) => { 
+                      // যদি গান চেঞ্জ করার সময় পজ হয়ে থাকে, তবে ফোর্স প্লে করা
+                      if (e.data === 5) e.target.playVideo(); 
+                      if (e.data === 1) setIsPlaying(true);
+                    }}
                   />
                 </div>
                 <div className="relative group">
