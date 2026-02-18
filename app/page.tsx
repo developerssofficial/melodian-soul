@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider } from "@/lib/firebase"; 
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, Loader2 } from "lucide-react";
+import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, LogIn, LogOut, Loader2 } from "lucide-react";
 import YouTube from "react-youtube";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,17 +12,10 @@ const API_KEYS = [
   "AIzaSyCIFum0PPHPcgK5ns55D-BfGvYgT0uQLJE"
 ];
 
-interface Song {
-  id: string;
-  title: string;
-  artist: string;
-  cover: string;
-}
-
 export default function MelodianSoul() {
   const [user, setUser] = useState<any>(null);
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [currentSong, setCurrentSong] = useState<Song | null>(null);
+  const [songs, setSongs] = useState<any[]>([]);
+  const [currentSong, setCurrentSong] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [player, setPlayer] = useState<any>(null);
   const [searchText, setSearchText] = useState("");
@@ -31,99 +24,89 @@ export default function MelodianSoul() {
   const [volume, setVolume] = useState(80);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false); // Minimal add for autoplay fix
 
   const moodKeywords = ["Bangla Lofi Mashup", "Coke Studio Bangla", "Arijit Singh Hits"];
 
   const searchMusic = async (query: string) => {
     if (!query) return;
 
-    const cacheKey = `cache_${query.toLowerCase()}`;
-    const cachedData = localStorage.getItem(cacheKey);
+    const cachedData = typeof window !== "undefined" ? localStorage.getItem(`cache_${query.toLowerCase()}`) : null;
     if (cachedData) {
-      const data: Song[] = JSON.parse(cachedData);
+      const data = JSON.parse(cachedData);
       setSongs(data);
-      if (data.length > 0) {
-        setCurrentSong(data[0]);
-      }
-      return;
+      if (data.length > 0) setCurrentSong(data[0]);
+      return; 
     }
 
     setLoading(true);
-    const fetchWithRotation = async (index: number): Promise<any> => {
-      if (index >= API_KEYS.length) {
-        alert("সব API Key limit শেষ! কিছুক্ষণ পর আবার চেষ্টা করো।");
-        throw new Error("All API keys exhausted");
-      }
+    const fetchDataWithRotation = async (index: number): Promise<any> => {
+      if (index >= API_KEYS.length) throw new Error("সবগুলো API Key-র লিমিট শেষ!");
       try {
-        const enhancedQuery = `${query} official music audio`;
-        const res = await fetch(
+        const enhancedQuery = `${query} official music`;
+        const response = await fetch(
           `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(enhancedQuery)}&type=video&videoCategoryId=10&key=${API_KEYS[index]}`
         );
-        if (res.status === 403 || res.status === 429) {
-          return fetchWithRotation(index + 1);
-        }
-        if (!res.ok) throw new Error(`API Error: ${res.status}`);
-        return await res.json();
+        if (response.status === 403) return fetchDataWithRotation(index + 1);
+        if (!response.ok) throw new Error("API Error");
+        return await response.json();
       } catch (err) {
-        if (index + 1 < API_KEYS.length) return fetchWithRotation(index + 1);
+        if (index + 1 < API_KEYS.length) return fetchDataWithRotation(index + 1);
         throw err;
       }
     };
 
     try {
-      const data = await fetchWithRotation(0);
-      if (data?.items?.length > 0) {
-        const formatted: Song[] = data.items.map((item: any) => ({
+      const data = await fetchDataWithRotation(0);
+      if (data?.items) {
+        const formatted = data.items.map((item: any) => ({
           id: item.id.videoId,
-          title: item.snippet.title.replace(/&#39;/g, "'").replace(/&quot;/g, '"'),
+          title: item.snippet.title,
           artist: item.snippet.channelTitle,
-          cover: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default.url,
+          cover: item.snippet.thumbnails.high.url,
         }));
-        localStorage.setItem(cacheKey, JSON.stringify(formatted));
+        localStorage.setItem(`cache_${query.toLowerCase()}`, JSON.stringify(formatted));
         setSongs(formatted);
-        setCurrentSong(formatted[0]);
+        if (formatted.length > 0) setCurrentSong(formatted[0]);
       }
     } catch (err: any) {
-      console.error("Search failed:", err.message);
+      console.error(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSongChange = useCallback((song: Song) => {
+  const handleSongChange = useCallback((song: any) => {
     setCurrentSong(song);
+    setIsPlaying(true); 
     
     if (player) {
-      player.loadVideoById({
-        videoId: song.id,
-        startSeconds: 0,
-      });
-      if (hasUserInteracted || isPlaying) {
+      player.loadVideoById(song.id);
+      if (hasUserInteracted) { // Minimal change: autoplay only after interaction
         player.playVideo();
       }
     }
-    setIsPlaying(true);
-  }, [player, hasUserInteracted, isPlaying]);
+  }, [player, hasUserInteracted]);
 
   const playNextSong = useCallback(() => {
-    if (songs.length === 0 || !currentSong) return;
-    const currentIndex = songs.findIndex(s => s.id === currentSong.id);
-    const nextIndex = (currentIndex + 1) % songs.length;
-    handleSongChange(songs[nextIndex]);
+    if (songs.length > 0) {
+      const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
+      const nextSong = songs[(currentIndex + 1) % songs.length];
+      handleSongChange(nextSong);
+    }
   }, [songs, currentSong, handleSongChange]);
 
-  const playPreviousSong = useCallback(() => {
-    if (songs.length === 0 || !currentSong) return;
-    const currentIndex = songs.findIndex(s => s.id === currentSong.id);
-    const prevIndex = (currentIndex - 1 + songs.length) % songs.length;
-    handleSongChange(songs[prevIndex]);
-  }, [songs, currentSong, handleSongChange]);
+  const playPreviousSong = () => {
+    if (songs.length > 0) {
+      const currentIndex = songs.findIndex((s) => s.id === currentSong?.id);
+      const prevSong = songs[(currentIndex - 1 + songs.length) % songs.length];
+      handleSongChange(prevSong);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
     searchMusic(moodKeywords[Math.floor(Math.random() * moodKeywords.length)]);
-
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
@@ -132,30 +115,24 @@ export default function MelodianSoul() {
     const interval = setInterval(() => {
       if (player && isPlaying) {
         try {
-          setCurrentTime(player.getCurrentTime() || 0);
-          setDuration(player.getDuration() || 0);
-        } catch {}
+          setCurrentTime(player.getCurrentTime());
+          setDuration(player.getDuration());
+        } catch (e) {}
       }
     }, 1000);
     return () => clearInterval(interval);
   }, [player, isPlaying]);
 
+  // Minimal add: User interaction for autoplay policy
   useEffect(() => {
-    const handleInteraction = () => {
-      setHasUserInteracted(true);
-      if (currentSong && player && !isPlaying) {
-        player.playVideo();
-        setIsPlaying(true);
-      }
-    };
-
-    document.addEventListener("click", handleInteraction, { once: true });
-    document.addEventListener("touchstart", handleInteraction, { once: true });
+    const handleInteraction = () => setHasUserInteracted(true);
+    document.addEventListener("click", handleInteraction);
+    document.addEventListener("touchstart", handleInteraction);
     return () => {
       document.removeEventListener("click", handleInteraction);
       document.removeEventListener("touchstart", handleInteraction);
     };
-  }, [currentSong, player, isPlaying]);
+  }, []);
 
   if (!mounted) return null;
 
@@ -173,11 +150,9 @@ export default function MelodianSoul() {
         </div>
 
         <div className="flex-1 max-w-xl mx-6 relative group">
-          <input
-            type="text"
-            placeholder="Search your vibe..."
+          <input 
+            type="text" placeholder="Search your vibe..." 
             className="w-full bg-white/5 border border-white/10 px-12 py-3 rounded-2xl outline-none focus:bg-white/10 transition-all backdrop-blur-md pr-12"
-            value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && searchMusic(searchText)}
           />
@@ -201,39 +176,18 @@ export default function MelodianSoul() {
         <div className="lg:col-span-8 space-y-8">
           <AnimatePresence mode="wait">
             {currentSong ? (
-              <motion.div
-                key={currentSong.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="relative rounded-[3rem] bg-white/[0.02] border border-white/10 p-8 md:p-12 flex flex-col md:flex-row items-center gap-10 backdrop-blur-3xl shadow-2xl"
-              >
-                <div className="hidden">
-                  <YouTube
-                    videoId={currentSong.id}
-                    opts={{
-                      height: "0",
-                      width: "0",
-                      playerVars: {
-                        autoplay: 0,
-                        controls: 0,
-                        rel: 0,
-                        modestbranding: 1,
-                        iv_load_policy: 3,
-                      },
-                    }}
-                    onReady={(e) => {
-                      setPlayer(e.target);
-                      e.target.setVolume(volume);
-                    }}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
+              <motion.div key={currentSong.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="relative rounded-[3rem] bg-white/[0.02] border border-white/10 p-8 md:p-12 flex flex-col md:flex-row items-center gap-10 backdrop-blur-3xl shadow-2xl">
+                 <div className="hidden">
+                  <YouTube 
+                    videoId={currentSong.id} 
+                    opts={{ playerVars: { autoplay: 0, controls: 0, rel: 0, modestbranding: 1 } }} 
+                    onReady={(e) => { setPlayer(e.target); e.target.setVolume(volume); }} 
+                    onPlay={() => setIsPlaying(true)} 
+                    onPause={() => setIsPlaying(false)} 
                     onEnd={playNextSong}
-                    onStateChange={(e) => {
+                    onStateChange={(e) => { 
+                      if (e.data === 5 && hasUserInteracted) e.target.playVideo(); // Minimal fix
                       if (e.data === 1) setIsPlaying(true);
-                      if (e.data === 5 && hasUserInteracted) {
-                        e.target.playVideo();
-                      }
                     }}
                   />
                 </div>
@@ -245,18 +199,10 @@ export default function MelodianSoul() {
                   <div className="inline-block bg-pink-500/20 px-4 py-1 rounded-full text-[10px] font-bold text-pink-400 mb-4 uppercase tracking-widest">Now Vibe</div>
                   <h2 className="text-3xl md:text-5xl font-black mb-2 leading-tight truncate max-w-md">{currentSong.title}</h2>
                   <p className="text-xl text-gray-400 mb-8 font-medium">{currentSong.artist}</p>
-                  <button
-                    onClick={() => {
-                      if (!player) return;
-                      if (isPlaying) {
-                        player.pauseVideo();
-                      } else {
-                        player.playVideo();
-                        setHasUserInteracted(true);
-                      }
-                    }}
-                    className="bg-white text-black px-12 py-4 rounded-full font-black flex items-center gap-3 hover:scale-105 transition-all shadow-xl"
-                  >
+                  <button onClick={() => { 
+                    if (isPlaying) player?.pauseVideo(); 
+                    else { player?.playVideo(); setHasUserInteracted(true); } // Minimal add
+                  }} className="bg-white text-black px-12 py-4 rounded-full font-black flex items-center gap-3 hover:scale-105 transition-all shadow-xl">
                     {isPlaying ? <Pause size={24} fill="black" /> : <Play size={24} fill="black" />} {isPlaying ? "PAUSE" : "PLAY NOW"}
                   </button>
                 </div>
