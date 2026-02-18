@@ -1,12 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { auth, googleProvider } from "@/lib/firebase"; 
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, LogIn, LogOut, Loader2 } from "lucide-react";
+import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, Loader2 } from "lucide-react";
 import YouTube from "react-youtube";
 import { motion, AnimatePresence } from "framer-motion";
 
-// তোমার সব কী-গুলো এখানে
+// তোমার API Key-গুলো
 const API_KEYS = [
   "AIzaSyD6-OdNvUqan2JsyPkGtDQm67VPGiyXXZk",
   "AIzaSyBrqfEYpyBc0HiMjNJcaBvSyOJM-ynha00",
@@ -14,7 +12,6 @@ const API_KEYS = [
 ];
 
 export default function MelodianSoul() {
-  const [user, setUser] = useState<any>(null);
   const [songs, setSongs] = useState<any[]>([]);
   const [currentSong, setCurrentSong] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -28,14 +25,12 @@ export default function MelodianSoul() {
 
   const moodKeywords = ["Bangla Lofi Mashup", "Coke Studio Bangla", "Arijit Singh Hits"];
 
-  // --- এই সেই ম্যাজিক্যাল স্মার্ট সার্চ ফাংশন ---
+  // --- স্মার্ট সার্চ ফাংশন ---
   const searchMusic = async (query: string) => {
     if (!query) return;
 
-    // ১. প্রথমে মেমোরি (Cache) চেক করা
     const cachedData = typeof window !== "undefined" ? localStorage.getItem(`cache_${query.toLowerCase()}`) : null;
     if (cachedData) {
-      console.log("Saving Quota! Loading from cache...");
       const data = JSON.parse(cachedData);
       setSongs(data);
       if (data.length > 0) setCurrentSong(data[0]);
@@ -73,9 +68,7 @@ export default function MelodianSoul() {
           cover: item.snippet.thumbnails.high.url,
         }));
 
-        // ২. মেমোরিতে সেভ করে রাখা যাতে পরে আর টাকা/কোটা খরচ না হয়
         localStorage.setItem(`cache_${query.toLowerCase()}`, JSON.stringify(formatted));
-        
         setSongs(formatted);
         if (formatted.length > 0) setCurrentSong(formatted[0]);
       }
@@ -85,7 +78,6 @@ export default function MelodianSoul() {
       setLoading(false);
     }
   };
-  // --- সার্চ ফাংশন শেষ ---
 
   const playNextSong = () => {
     if (songs.length > 0) {
@@ -104,8 +96,6 @@ export default function MelodianSoul() {
   useEffect(() => {
     setMounted(true);
     searchMusic(moodKeywords[Math.floor(Math.random() * moodKeywords.length)]);
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -147,14 +137,7 @@ export default function MelodianSoul() {
         </div>
 
         <div className="flex items-center gap-4">
-          {user ? (
-            <div className="flex items-center gap-3 bg-white/5 p-1.5 pr-4 rounded-full border border-white/10">
-              <img src={user.photoURL} className="w-8 h-8 rounded-full border border-pink-500/50" />
-              <button onClick={() => signOut(auth)} className="text-[10px] font-bold text-gray-400 hover:text-white uppercase">Logout</button>
-            </div>
-          ) : (
-            <button onClick={() => signInWithPopup(auth, googleProvider)} className="bg-gradient-to-r from-pink-600 to-purple-600 px-6 py-2.5 rounded-full text-xs font-black shadow-lg">Login</button>
-          )}
+           <span className="text-xs font-medium text-gray-400 hidden md:block">Enjoy the Music!</span>
         </div>
       </nav>
 
@@ -257,4 +240,3 @@ export default function MelodianSoul() {
     </main>
   );
 }
-
