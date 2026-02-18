@@ -6,11 +6,12 @@ import { Music, Search, Play, Pause, Heart, SkipBack, SkipForward, Volume2, LogI
 import YouTube from "react-youtube";
 import { motion, AnimatePresence } from "framer-motion";
 
+// তোমার সব কী-গুলো এখানে
 const API_KEYS = [
-  process.env.NEXT_PUBLIC_YT_KEY_1,
-  process.env.NEXT_PUBLIC_YT_KEY_2,
-  process.env.NEXT_PUBLIC_YT_KEY_3
-].filter(Boolean) as string[];
+  "AIzaSyD6-OdNvUqan2JsyPkGtDQm67VPGiyXXZk",
+  "AIzaSyBrqfEYpyBc0HiMjNJcaBvSyOJM-ynha00",
+  "AIzaSyCIFum0PPHPcgK5ns55D-BfGvYgT0uQLJE"
+];
 
 export default function MelodianSoul() {
   const [user, setUser] = useState<any>(null);
